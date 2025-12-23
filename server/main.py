@@ -1,7 +1,9 @@
-import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import osicFiles
 from sqlalchemy.orm import Session
 import json
 import asyncio
@@ -238,6 +240,29 @@ async def update_alarm_config(config: AlarmConfigUpdate, current_user: User = De
     
     db.commit()
     return {"status": "success"}
+
+# --- 静态文件托管 (SPA) ---
+
+# 挂载静态文件目录
+if os.path.exists("client/dist"):
+    app.mount("/assets", StaticFiles(directory="client/dist/assets"), name="assets")
+    # 挂载其他可能的静态资源目录，如 images
+    if os.path.exists("client/dist/images"):
+        app.mount("/images", StaticFiles(directory="client/dist/images"), name="images")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # 如果请求的是 API 或 WebSocket，不处理（由上面的路由处理）
+        if full_path.startswith("api") or full_path.startswith("ws"):
+            return None # 应该由具体的路由处理，这里只是为了避免覆盖
+        
+        # 检查文件是否存在于 dist 根目录 (如 favicon.ico, robots.txt)
+        file_path = os.path.join("client/dist", full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+            
+        # 否则返回 index.html (SPA 路由)
+        return FileResponse("client/dist/index.html")
 
 # --- WebSocket 核心逻辑 ---
 

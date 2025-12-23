@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: live-assistant-panel
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change_this_secret_key_in_production}
+      - DATABASE_URL=sqlite:////app/data/sql_app.db
+      - FUNASR_HOST=${FUNASR_HOST:-funasr}
+      - FUNASR_PORT=${FUNASR_PORT:-10095}
+
+  # 模拟 FunASR 服务 (仅用于测试，实际部署时可移除或指向真实服务)
+  # funasr:
+  #   image: registry.cn-hangzhou.aliyuncs.com/funasr/funasr-runtime-sdk-cpu:latest
+  #   ports:
+  #     - "10095:10095"

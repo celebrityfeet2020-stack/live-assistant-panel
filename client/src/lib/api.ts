@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.PROD ? "" : (import.meta.env.VITE_API_URL || "http://localhost:8000");
 
 export const api = {
   async login(username: string, password: string) {
@@ -125,6 +125,6 @@ export const api = {
 
 export const getWsUrl = (userId: number) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_API_HOST || "localhost:8000";
+    const host = import.meta.env.PROD ? window.location.host : (import.meta.env.VITE_API_HOST || "localhost:8000");
     return `${protocol}//${host}/ws/admin/${userId}`;
 }
