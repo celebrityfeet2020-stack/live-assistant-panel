@@ -6,14 +6,23 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Plus, Save, Server, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 // 定义配置项接口
 interface LinkConfig {
   id: number;
   keywords: string[];
+}
+
+// 日志接口
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  message: string;
 }
 
 // 默认配置：5个链接
@@ -27,17 +36,40 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [inputValue, setInputValue] = useState<{ [key: number]: string }>({});
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isLogOpen, setIsLogOpen] = useState(true);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [, setLocation] = useLocation();
 
-  // 模拟从后端加载配置
+  // 自动滚动日志
+  useEffect(() => {
+    if (isLogOpen && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs, isLogOpen]);
+
+  // 模拟从后端加载配置和接收日志
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         // TODO: 替换为真实的 API 调用
-        // const res = await fetch('/api/config');
-        // const data = await res.json();
-        // setConfigs(data);
         setIsConnected(true);
         toast.success("已连接到 ASR 服务");
+        
+        // 模拟接收日志
+        const interval = setInterval(() => {
+          const newLog: LogEntry = {
+            id: Date.now().toString(),
+            timestamp: new Date().toLocaleTimeString(),
+            type: Math.random() > 0.7 ? 'success' : 'info',
+            message: Math.random() > 0.7 
+              ? `识别到关键词: "链接 ${Math.floor(Math.random() * 5) + 1}" -> 触发点击` 
+              : `接收到语音片段: ${Math.random().toString(36).substring(7)}...`
+          };
+          setLogs(prev => [...prev.slice(-99), newLog]);
+        }, 3000);
+        
+        return () => clearInterval(interval);
       } catch (error) {
         console.error("Failed to fetch config:", error);
         toast.error("无法连接到 ASR 服务");
@@ -47,6 +79,48 @@ export default function Home() {
 
     fetchConfig();
   }, []);
+
+  // 退出登录
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setLocation("/login");
+  };
+
+  // 导出配置
+  const handleExport = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(configs, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "live_assistant_config.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    toast.success("配置已导出");
+  };
+
+  // 导入配置
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedConfigs = JSON.parse(e.target?.result as string);
+        if (Array.isArray(importedConfigs)) {
+          setConfigs(importedConfigs);
+          toast.success("配置已导入");
+        } else {
+          toast.error("无效的配置文件格式");
+        }
+      } catch (error) {
+        toast.error("解析配置文件失败");
+      }
+    };
+    reader.readAsText(file);
+    // 清空 input value 以便重复导入同一文件
+    event.target.value = '';
+  };
 
   // 添加关键词
   const handleAddKeyword = (id: number, keyword: string) => {
@@ -146,10 +220,28 @@ export default function Home() {
               <span>{isConnected ? "服务在线" : "连接断开"}</span>
             </div>
             
+            <div className="flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+              <Button variant="ghost" size="icon" onClick={handleExport} title="导出配置">
+                <Download className="h-4 w-4" />
+              </Button>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  title="导入配置"
+                />
+                <Button variant="ghost" size="icon">
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             <Button 
               onClick={handleSave} 
               disabled={isSaving}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all ml-2"
             >
               {isSaving ? (
                 <Activity className="mr-2 h-4 w-4 animate-spin" />
@@ -158,12 +250,16 @@ export default function Home() {
               )}
               {isSaving ? "保存中..." : "保存配置"}
             </Button>
+
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-2 text-muted-foreground hover:text-destructive">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="container relative z-10 py-8">
-        <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
+      <main className="container relative z-10 py-8 flex flex-col h-[calc(100vh-4rem)]">
+        <ScrollArea className="flex-grow pr-4 mb-4">
           <div className="flex flex-col gap-4 pb-20 max-w-5xl mx-auto">
             <AnimatePresence mode="popLayout">
               {configs.map((config) => (
@@ -258,6 +354,44 @@ export default function Home() {
             </AnimatePresence>
           </div>
         </ScrollArea>
+
+        {/* 实时日志面板 */}
+        <div className={`border-t border-white/10 bg-black/40 backdrop-blur-md transition-all duration-300 ease-in-out flex flex-col ${isLogOpen ? 'h-64' : 'h-10'}`}>
+          <div 
+            className="flex items-center justify-between px-4 py-2 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+            onClick={() => setIsLogOpen(!isLogOpen)}
+          >
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Terminal className="h-3 w-3" />
+              <span>实时运行日志</span>
+            </div>
+            {isLogOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
+          </div>
+          
+          {isLogOpen && (
+            <ScrollArea className="flex-grow p-4 font-mono text-xs">
+              <div className="space-y-1">
+                {logs.length === 0 && (
+                  <div className="text-muted-foreground/50 italic">等待日志数据...</div>
+                )}
+                {logs.map((log) => (
+                  <div key={log.id} className="flex gap-2">
+                    <span className="text-muted-foreground/50">[{log.timestamp}]</span>
+                    <span className={cn(
+                      log.type === 'success' ? 'text-emerald-400' : 
+                      log.type === 'error' ? 'text-rose-400' : 
+                      log.type === 'warning' ? 'text-amber-400' : 
+                      'text-blue-300'
+                    )}>
+                      {log.message}
+                    </span>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </ScrollArea>
+          )}
+        </div>
       </main>
     </div>
   );

@@ -1,18 +1,35 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Login from "./pages/Login";
+import { useEffect } from "react";
 
+// 简单的路由保护组件
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const [location, setLocation] = useLocation();
+  
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setLocation("/login");
+    }
+  }, [setLocation]);
+
+  return <Component />;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/login" component={Login} />
+      <Route path="/">
+        <ProtectedRoute component={Home} />
+      </Route>
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
