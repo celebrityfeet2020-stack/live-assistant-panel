@@ -6,10 +6,12 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut } from "lucide-react";
+import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut, Link as LinkIcon, Copy, History } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // 定义配置项接口
 interface LinkConfig {
@@ -40,6 +42,7 @@ export default function Home() {
   const [isLogOpen, setIsLogOpen] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
+  const [wsUrl, setWsUrl] = useState("ws://212.64.83.18:17822/ws/user_123"); // 模拟专属连接地址
 
   // 自动滚动日志
   useEffect(() => {
@@ -47,6 +50,12 @@ export default function Home() {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs, isLogOpen]);
+
+  // 复制连接地址
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(wsUrl);
+    toast.success("连接地址已复制");
+  };
 
   // 模拟从后端加载配置和接收日志
   useEffect(() => {
@@ -221,6 +230,38 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-2 border-l border-white/10 pl-4 ml-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" title="获取插件连接地址">
+                    <LinkIcon className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card/95 backdrop-blur-xl border-white/10">
+                  <DialogHeader>
+                    <DialogTitle>插件连接配置</DialogTitle>
+                    <DialogDescription>
+                      请将以下地址填入 Chrome 插件的服务器地址栏中，以区分不同的直播间。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center gap-2 mt-4 p-3 bg-secondary/50 rounded-lg border border-white/5">
+                    <code className="flex-1 text-sm font-mono text-primary break-all">
+                      {wsUrl}
+                    </code>
+                    <Button variant="ghost" size="icon" onClick={handleCopyUrl} className="h-8 w-8 shrink-0">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-4 text-xs text-muted-foreground">
+                    <p>说明：</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>每个账号拥有唯一的连接地址</li>
+                      <li>支持多个直播间同时使用不同账号登录</li>
+                      <li>请勿将此地址泄露给他人</li>
+                    </ul>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <Button variant="ghost" size="icon" onClick={handleExport} title="导出配置">
                 <Download className="h-4 w-4" />
               </Button>
@@ -356,40 +397,60 @@ export default function Home() {
         </ScrollArea>
 
         {/* 实时日志面板 */}
-        <div className={`border-t border-white/10 bg-black/40 backdrop-blur-md transition-all duration-300 ease-in-out flex flex-col ${isLogOpen ? 'h-64' : 'h-10'}`}>
+        <div className={`border-t border-white/10 bg-black/40 backdrop-blur-md transition-all duration-300 ease-in-out flex flex-col ${isLogOpen ? 'h-80' : 'h-10'}`}>
           <div 
             className="flex items-center justify-between px-4 py-2 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
             onClick={() => setIsLogOpen(!isLogOpen)}
           >
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Terminal className="h-3 w-3" />
-              <span>实时运行日志</span>
+              <span>运行日志</span>
             </div>
             {isLogOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronUp className="h-3 w-3 text-muted-foreground" />}
           </div>
           
           {isLogOpen && (
-            <ScrollArea className="flex-grow p-4 font-mono text-xs">
-              <div className="space-y-1">
-                {logs.length === 0 && (
-                  <div className="text-muted-foreground/50 italic">等待日志数据...</div>
-                )}
-                {logs.map((log) => (
-                  <div key={log.id} className="flex gap-2">
-                    <span className="text-muted-foreground/50">[{log.timestamp}]</span>
-                    <span className={cn(
-                      log.type === 'success' ? 'text-emerald-400' : 
-                      log.type === 'error' ? 'text-rose-400' : 
-                      log.type === 'warning' ? 'text-amber-400' : 
-                      'text-blue-300'
-                    )}>
-                      {log.message}
-                    </span>
-                  </div>
-                ))}
-                <div ref={logsEndRef} />
+            <Tabs defaultValue="realtime" className="flex-grow flex flex-col">
+              <div className="px-4 py-1 border-b border-white/5 flex items-center justify-between">
+                <TabsList className="h-7 bg-transparent p-0 gap-4">
+                  <TabsTrigger value="realtime" className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 text-xs">实时监控</TabsTrigger>
+                  <TabsTrigger value="history" className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 text-xs">历史记录</TabsTrigger>
+                </TabsList>
               </div>
-            </ScrollArea>
+
+              <TabsContent value="realtime" className="flex-grow p-0 m-0 overflow-hidden">
+                <ScrollArea className="h-full p-4 font-mono text-xs">
+                  <div className="space-y-1">
+                    {logs.length === 0 && (
+                      <div className="text-muted-foreground/50 italic">等待日志数据...</div>
+                    )}
+                    {logs.map((log) => (
+                      <div key={log.id} className="flex gap-2">
+                        <span className="text-muted-foreground/50">[{log.timestamp}]</span>
+                        <span className={cn(
+                          log.type === 'success' ? 'text-emerald-400' : 
+                          log.type === 'error' ? 'text-rose-400' : 
+                          log.type === 'warning' ? 'text-amber-400' : 
+                          'text-blue-300'
+                        )}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))}
+                    <div ref={logsEndRef} />
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="history" className="flex-grow p-0 m-0 overflow-hidden">
+                <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs">
+                  <div className="text-center space-y-2">
+                    <History className="h-8 w-8 mx-auto opacity-50" />
+                    <p>历史日志查询功能将在连接数据库后启用</p>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
         </div>
       </main>
