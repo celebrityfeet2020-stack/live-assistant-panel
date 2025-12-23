@@ -7,6 +7,7 @@ import { Activity, Lock } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -19,19 +20,16 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // TODO: 替换为真实的 API 调用
-      // const res = await fetch('/api/login', { ... });
+      const data = await api.login(username, password);
+      localStorage.setItem("token", data.access_token);
+      // 简单解析token获取user_id (实际应更严谨)
+      const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+      localStorage.setItem("user_id", payload.id);
       
-      // 模拟登录验证
-      if (username === "admin" && password === "admin") {
-        localStorage.setItem("token", "mock-token");
-        toast.success("登录成功");
-        setTimeout(() => setLocation("/"), 500);
-      } else {
-        toast.error("用户名或密码错误");
-      }
+      toast.success("登录成功");
+      setTimeout(() => setLocation("/"), 500);
     } catch (error) {
-      toast.error("登录失败，请重试");
+      toast.error("用户名或密码错误");
     } finally {
       setIsLoading(false);
     }

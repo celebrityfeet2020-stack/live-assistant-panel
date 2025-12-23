@@ -6,12 +6,14 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut, Link as LinkIcon, Copy, History } from "lucide-react";
+import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut, Link as LinkIcon, Copy, History, BarChart3, ShieldCheck } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { api, getWsUrl } from "@/lib/api";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // 定义配置项接口
 interface LinkConfig {
@@ -34,7 +36,7 @@ const DEFAULT_CONFIG: LinkConfig[] = Array.from({ length: 5 }, (_, i) => ({
 }));
 
 export default function Home() {
-  const [configs, setConfigs] = useState<LinkConfig[]>(DEFAULT_CONFIG);
+  const [configs, setConfigs] = useState<LinkConfig[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [inputValue, setInputValue] = useState<{ [key: number]: string }>({});
@@ -42,7 +44,9 @@ export default function Home() {
   const [isLogOpen, setIsLogOpen] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
-  const [wsUrl, setWsUrl] = useState("ws://212.64.83.18:17822/ws/user_123"); // 模拟专属连接地址
+  const [wsUrl, setWsUrl] = useState("");
+  const [stats, setStats] = useState<{today_triggers: number}>({today_triggers: 0});
+  const [historyLogs, setHistoryLogs] = useState<any[]>([]);
 
   // 自动滚动日志
   useEffect(() => {
@@ -57,37 +61,75 @@ export default function Home() {
     toast.success("连接地址已复制");
   };
 
-  // 模拟从后端加载配置和接收日志
+  // 加载配置和建立WebSocket连接
   useEffect(() => {
-    const fetchConfig = async () => {
+    const init = async () => {
       try {
-        // TODO: 替换为真实的 API 调用
-        setIsConnected(true);
-        toast.success("已连接到 ASR 服务");
-        
-        // 模拟接收日志
-        const interval = setInterval(() => {
-          const newLog: LogEntry = {
-            id: Date.now().toString(),
-            timestamp: new Date().toLocaleTimeString(),
-            type: Math.random() > 0.7 ? 'success' : 'info',
-            message: Math.random() > 0.7 
-              ? `识别到关键词: "链接 ${Math.floor(Math.random() * 5) + 1}" -> 触发点击` 
-              : `接收到语音片段: ${Math.random().toString(36).substring(7)}...`
-          };
-          setLogs(prev => [...prev.slice(-99), newLog]);
-        }, 3000);
-        
-        return () => clearInterval(interval);
+        // 1. 加载配置
+        const data = await api.getConfig();
+        if (data.length > 0) {
+          setConfigs(data);
+        } else {
+          setConfigs(DEFAULT_CONFIG);
+        }
+
+        // 2. 设置插件连接地址
+        const userId = localStorage.getItem("user_id");
+        if (userId) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host; // 假设部署后同域
+            // 实际部署时可能需要指定IP
+            setWsUrl(`${protocol}//${host}/ws/plugin/${userId}`);
+            
+            // 3. 建立管理端WebSocket连接
+            const ws = new WebSocket(getWsUrl(parseInt(userId)));
+            
+            ws.onopen = () => {
+                setIsConnected(true);
+                toast.success("已连接到服务器");
+            };
+            
+            ws.onmessage = (event) => {
+                const log = JSON.parse(event.data);
+                setLogs(prev => [...prev.slice(-99), log]);
+                
+                // 如果是成功触发，更新统计
+                if (log.type === 'success') {
+                    setStats(prev => ({...prev, today_triggers: prev.today_triggers + 1}));
+                }
+            };
+            
+            ws.onclose = () => {
+                setIsConnected(false);
+                toast.error("与服务器断开连接");
+            };
+
+            return () => ws.close();
+        }
       } catch (error) {
-        console.error("Failed to fetch config:", error);
-        toast.error("无法连接到 ASR 服务");
-        setIsConnected(false);
+        console.error("Init failed:", error);
       }
     };
 
-    fetchConfig();
+    init();
+    
+    // 加载统计数据
+    api.getStats().then(setStats).catch(console.error);
+    // 加载历史日志
+    api.getHistoryLogs().then(setHistoryLogs).catch(console.error);
   }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await api.saveConfig(configs);
+      toast.success("配置已保存");
+    } catch (error) {
+      toast.error("保存失败");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // 退出登录
   const handleLogout = () => {
@@ -177,27 +219,7 @@ export default function Home() {
     toast.info(`已删除链接 #${id}`);
   };
 
-  // 保存配置
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      // TODO: 替换为真实的 API 调用
-      // await fetch('/api/config', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(configs),
-      // });
-      
-      // 模拟延迟
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      toast.success("配置已保存并生效");
-    } catch (error) {
-      console.error("Failed to save config:", error);
-      toast.error("保存失败");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
@@ -292,7 +314,10 @@ export default function Home() {
               {isSaving ? "保存中..." : "保存配置"}
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-2 text-muted-foreground hover:text-destructive">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/audit")} className="ml-2 text-muted-foreground hover:text-primary" title="操作审计">
+              <ShieldCheck className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-2 text-muted-foreground hover:text-destructive" title="退出登录">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -442,13 +467,43 @@ export default function Home() {
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="history" className="flex-grow p-0 m-0 overflow-hidden">
-                <div className="h-full flex items-center justify-center text-muted-foreground/50 text-xs">
-                  <div className="text-center space-y-2">
-                    <History className="h-8 w-8 mx-auto opacity-50" />
-                    <p>历史日志查询功能将在连接数据库后启用</p>
-                  </div>
+              <TabsContent value="history" className="flex-grow p-0 m-0 overflow-hidden flex flex-col">
+                <div className="p-4 grid grid-cols-3 gap-4 border-b border-white/5">
+                    <div className="bg-white/5 p-3 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">今日触发次数</div>
+                        <div className="text-2xl font-bold text-primary">{stats.today_triggers}</div>
+                    </div>
+                    <div className="col-span-2 bg-white/5 p-3 rounded-lg flex flex-col">
+                        <div className="text-xs text-muted-foreground mb-1">最近触发趋势</div>
+                        <div className="flex-grow h-16 w-full">
+                             <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={historyLogs.slice(0, 10).reverse()}>
+                                  <Bar dataKey="id" fill="#8884d8">
+                                    {historyLogs.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.type === 'success' ? '#10b981' : '#3b82f6'} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                        </div>
+                    </div>
                 </div>
+                <ScrollArea className="flex-grow p-4 font-mono text-xs">
+                  <div className="space-y-1">
+                    {historyLogs.map((log) => (
+                      <div key={log.id} className="flex gap-2 border-b border-white/5 pb-1 mb-1">
+                        <span className="text-muted-foreground/50 w-32">[{new Date(log.timestamp).toLocaleString()}]</span>
+                        <span className={cn(
+                          log.type === 'success' ? 'text-emerald-400' : 
+                          log.type === 'error' ? 'text-rose-400' : 
+                          'text-blue-300'
+                        )}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </TabsContent>
             </Tabs>
           )}
