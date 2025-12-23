@@ -164,34 +164,29 @@ export default function Home() {
 
       <main className="container relative z-10 py-8">
         <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+          <div className="flex flex-col gap-4 pb-20 max-w-5xl mx-auto">
             <AnimatePresence mode="popLayout">
               {configs.map((config) => (
                 <motion.div
                   key={config.id}
                   layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="h-full border-white/5 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-colors group">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        链接 #{config.id}
-                      </CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRemoveLink(config.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+                  <Card className="border-white/5 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-colors group">
+                    <div className="flex flex-col md:flex-row items-start md:items-center p-4 gap-4">
+                      {/* 序号 */}
+                      <div className="flex-shrink-0 w-24 pt-2 md:pt-0">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          链接 #{config.id}
+                        </span>
+                      </div>
+
+                      {/* 关键词区域 */}
+                      <div className="flex-grow flex flex-col gap-3 w-full">
+                        <div className="flex flex-wrap gap-2 min-h-[2rem] items-center">
                           <AnimatePresence>
                             {config.keywords.map((keyword) => (
                               <motion.div
@@ -199,7 +194,7 @@ export default function Home() {
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.8 }}
-                                className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary border border-primary/20"
+                                className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary border border-primary/20"
                               >
                                 {keyword}
                                 <button
@@ -211,38 +206,41 @@ export default function Home() {
                               </motion.div>
                             ))}
                           </AnimatePresence>
-                          {config.keywords.length === 0 && (
-                            <span className="text-xs text-muted-foreground/50 italic py-1">
-                              暂无触发词...
-                            </span>
-                          )}
-                        </div>
-                        
-                        <Separator className="bg-white/5" />
-                        
-                        <div className="relative">
-                          <Input
-                            placeholder="输入触发词，回车添加"
-                            value={inputValue[config.id] || ""}
-                            onChange={(e) => setInputValue({ ...inputValue, [config.id]: e.target.value })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleAddKeyword(config.id, inputValue[config.id] || "");
-                              }
-                            }}
-                            className="bg-secondary/50 border-white/5 focus-visible:ring-primary/30 text-sm"
-                          />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/50 pointer-events-none">
-                            ↵ Enter
+                          
+                          {/* 输入框直接跟在标签后面 */}
+                          <div className="relative min-w-[200px] flex-grow max-w-xs">
+                            <Input
+                              placeholder={config.keywords.length === 0 ? "输入触发词，回车添加..." : "继续添加..."}
+                              value={inputValue[config.id] || ""}
+                              onChange={(e) => setInputValue({ ...inputValue, [config.id]: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleAddKeyword(config.id, inputValue[config.id] || "");
+                                }
+                              }}
+                              className="h-8 bg-transparent border-transparent hover:border-white/10 focus:border-primary/30 focus:bg-secondary/30 transition-all text-sm px-2 shadow-none"
+                            />
                           </div>
                         </div>
                       </div>
-                    </CardContent>
+
+                      {/* 操作按钮 */}
+                      <div className="flex-shrink-0 ml-auto pl-4 border-l border-white/5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRemoveLink(config.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </Card>
                 </motion.div>
               ))}
               
-              {/* 添加按钮卡片 */}
+              {/* 添加按钮 */}
               <motion.div
                 layout
                 initial={{ opacity: 0 }}
@@ -251,11 +249,9 @@ export default function Home() {
               >
                 <button
                   onClick={handleAddLink}
-                  className="flex h-full w-full min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-white/10 bg-white/5 p-6 text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground hover:border-primary/30 group"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground hover:border-primary/30 group"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 group-hover:bg-primary/20 group-hover:text-primary transition-colors">
-                    <Plus className="h-6 w-6" />
-                  </div>
+                  <Plus className="h-5 w-5 group-hover:text-primary transition-colors" />
                   <span className="text-sm font-medium">添加新链接配置</span>
                 </button>
               </motion.div>
