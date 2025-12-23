@@ -10,9 +10,9 @@ from typing import List, Dict
 from datetime import datetime, timedelta
 
 from database import engine, SessionLocal, Base
-from models import User, Config, Log, Audit
+from models import User, Config, Log, Audit, AlarmConfig
 from auth import get_current_user, create_access_token, authenticate_user, get_password_hash
-from schemas import Token, UserLogin, ConfigUpdate, LogQuery
+from schemas import Token, UserLogin, ConfigUpdate, LogQuery, UserCreate, UserResponse, AlarmConfigUpdate
 
 # 初始化日志
 logging.basicConfig(level=logging.INFO)
@@ -94,7 +94,7 @@ manager = ConnectionManager()
 # --- 认证接口 ---
 
 @app.post("/api/token", response_model=Token)
-async def login_for_access_token(form_data: UserLogin, db: Session = Depends(get_db)):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -102,16 +102,17 @@ async def login_for_access_token(form_data: UserLogin, db: Session = Depends(get
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=3000) # 长效Token方便演示
-    access_token = create_access_token(
-        data={"sub": user.username, "id": user.id}, expires_delta=access_token_expires
-    )
     
-    # 记录审计日志
+    # 记录登录审计
     audit = Audit(user_id=user.id, action="login", details="User logged in", ip_address="unknown")
     db.add(audit)
     db.commit()
-    
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "id": user.id, "is_superuser": user.is_superuser}, 
+        expires_delta=access_token_expires
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 # --- 配置管理接口 ---
@@ -163,6 +164,80 @@ async def get_stats(current_user: User = Depends(get_current_user), db: Session 
 async def get_audits(limit: int = 50, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     audits = db.query(Audit).filter(Audit.user_id == current_user.id).order_by(Audit.timestamp.desc()).limit(limit).all()
     return audits
+
+# --- 用户管理接口 (仅超级管理员) ---
+
+@app.get("/api/users", response_model=List[UserResponse])
+async def get_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return db.query(User).all()
+
+@app.post("/api/users", response_model=UserResponse)
+async def create_user(user: UserCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    new_user = User(
+        username=user.username,
+        hashed_password=get_password_hash(user.password),
+        is_superuser=user.is_superuser
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # 记录审计
+    audit = Audit(user_id=current_user.id, action="create_user", details=f"Created user {user.username}", ip_address="unknown")
+    db.add(audit)
+    db.commit()
+    
+    return new_user
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db.delete(user)
+    
+    # 记录审计
+    audit = Audit(user_id=current_user.id, action="delete_user", details=f"Deleted user {user.username}", ip_address="unknown")
+    db.add(audit)
+    db.commit()
+    
+    return {"status": "success"}
+
+# --- 告警配置接口 ---
+
+@app.get("/api/alarm-config")
+async def get_alarm_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    config = db.query(AlarmConfig).filter(AlarmConfig.user_id == current_user.id).first()
+    if not config:
+        return {"no_recognition_threshold": 300, "email_notification": False, "email_address": ""}
+    return config
+
+@app.post("/api/alarm-config")
+async def update_alarm_config(config: AlarmConfigUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_config = db.query(AlarmConfig).filter(AlarmConfig.user_id == current_user.id).first()
+    if not db_config:
+        db_config = AlarmConfig(user_id=current_user.id)
+        db.add(db_config)
+    
+    db_config.no_recognition_threshold = config.no_recognition_threshold
+    db_config.email_notification = config.email_notification
+    db_config.email_address = config.email_address
+    
+    db.commit()
+    return {"status": "success"}
 
 # --- WebSocket 核心逻辑 ---
 

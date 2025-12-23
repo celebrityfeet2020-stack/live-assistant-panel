@@ -12,7 +12,8 @@ def init_db():
         print("Creating default admin user...")
         admin_user = User(
             username="admin",
-            hashed_password=get_password_hash("admin123") # 默认密码
+            hashed_password=get_password_hash("admin123"), # 默认密码
+            is_superuser=True
         )
         db.add(admin_user)
         db.commit()

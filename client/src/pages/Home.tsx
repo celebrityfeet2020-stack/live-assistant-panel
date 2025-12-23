@@ -6,7 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut, Link as LinkIcon, Copy, History, BarChart3, ShieldCheck } from "lucide-react";
+import { Activity, Plus, Save, Server, Trash2, X, Terminal, ChevronUp, ChevronDown, Download, Upload, LogOut, Link as LinkIcon, Copy, History, BarChart3, ShieldCheck, Users } from "lucide-react";
+import AlarmSettings from "@/components/AlarmSettings";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -314,6 +315,7 @@ export default function Home() {
               {isSaving ? "保存中..." : "保存配置"}
             </Button>
 
+            <AlarmSettings />
             <Button variant="ghost" size="icon" onClick={() => setLocation("/audit")} className="ml-2 text-muted-foreground hover:text-primary" title="操作审计">
               <ShieldCheck className="h-4 w-4" />
             </Button>

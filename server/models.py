@@ -10,8 +10,10 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
 
     configs = relationship("Config", back_populates="owner")
+    alarm_config = relationship("AlarmConfig", uselist=False, back_populates="owner")
     logs = relationship("Log", back_populates="owner")
     audits = relationship("Audit", back_populates="owner")
 
@@ -48,3 +50,14 @@ class Audit(Base):
     ip_address = Column(String)
 
     owner = relationship("User", back_populates="audits")
+
+class AlarmConfig(Base):
+    __tablename__ = "alarm_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    no_recognition_threshold = Column(Integer, default=300) # 连续多少秒无识别结果报警
+    email_notification = Column(Boolean, default=False)
+    email_address = Column(String, nullable=True)
+
+    owner = relationship("User", back_populates="alarm_config")

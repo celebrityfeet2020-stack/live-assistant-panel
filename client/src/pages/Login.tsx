@@ -25,6 +25,10 @@ export default function Login() {
       // 简单解析token获取user_id (实际应更严谨)
       const payload = JSON.parse(atob(data.access_token.split('.')[1]));
       localStorage.setItem("user_id", payload.id);
+      // 注意：JWT payload中需要包含is_superuser字段，后端auth.py需要相应更新
+      // 这里暂时假设后端已返回或通过其他方式获取，实际应在create_access_token中添加
+      // 临时方案：再次请求用户信息确认权限，或者让后端在token中带上
+
       
       toast.success("登录成功");
       setTimeout(() => setLocation("/"), 500);

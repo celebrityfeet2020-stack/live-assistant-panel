@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Audit from "./pages/Audit";
+import Users from "./pages/Users";
 import { useEffect } from "react";
 
 // 简单的路由保护组件
@@ -32,6 +33,9 @@ function Router() {
       </Route>
       <Route path="/audit">
         <ProtectedRoute component={Audit} />
+      </Route>
+      <Route path="/users">
+        <ProtectedRoute component={Users} />
       </Route>
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

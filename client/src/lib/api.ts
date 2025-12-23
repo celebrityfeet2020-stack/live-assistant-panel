@@ -65,6 +65,61 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.json();
+  },
+
+  async getUsers() {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to fetch users");
+    return res.json();
+  },
+
+  async createUser(user: any) {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/users`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify(user),
+    });
+    if (!res.ok) throw new Error("Failed to create user");
+    return res.json();
+  },
+
+  async deleteUser(userId: number) {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to delete user");
+    return res.json();
+  },
+
+  async getAlarmConfig() {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/alarm-config`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.json();
+  },
+
+  async updateAlarmConfig(config: any) {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE_URL}/api/alarm-config`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify(config),
+    });
+    if (!res.ok) throw new Error("Failed to update alarm config");
+    return res.json();
   }
 };
 
