@@ -3,16 +3,17 @@ FROM node:20-alpine as frontend-builder
 WORKDIR /app
 
 # Copy root package files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 
-# Install dependencies
-RUN npm install -g pnpm && pnpm install
+# Install dependencies using npm
+# Use --legacy-peer-deps to avoid conflicts
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
 
 # Build frontend
-RUN pnpm build
+RUN npm run build
 
 # Setup Backend
 FROM python:3.11-slim
