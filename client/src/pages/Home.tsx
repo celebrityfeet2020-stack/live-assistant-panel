@@ -120,6 +120,8 @@ export default function Home() {
     api.getHistoryLogs().then(setHistoryLogs).catch(console.error);
   }, []);
 
+
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
